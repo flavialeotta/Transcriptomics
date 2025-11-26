@@ -1,0 +1,221 @@
+---
+title: "Assemblers performance"
+author: "Flavia Leotta"
+date: "2025-11-24"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assemblers performance review
+This R-markdown file aims to provide a quick overview of assemblers (MEGAHIT, spades, Trinity) performance on _denovo_ assembly of .fastq files from sample KRU (Lake Kruczek mały) from the University of Warsaw. Because of computational limitations, I used the assemblies already computed by PhD candidate Malczewska, although the Snakemake pipeline that produces these assemblies was previously proved to work smoothly.
+
+To assess assemblies quality, I based my investigation on the paper by Huang, X., Chen, _et al._ (2016) ("Comparative performance of transcriptome assembly methods for non-model organisms". _BMC Genomics_, 17, 523. https://doi.org/10.1186/s12864-016-2923-8), which suggested to evaluate assemblers using the following metrics:
+
+- contig number;
+- contig length;
+- paired-end mapping percentage;
+- gene model representation.
+
+Unfortunately, the last metric is not appliable in our case since we don't know exactly the organisms that produced the transcripts in our samples, so we cannot use a reference genome.
+
+## 0. Reads quality
+Before proceeding with the comparative analysis of the assemblers performance, I first checked the quality of the transcript reads, using `fastqc` (v0.11.5) and `multiqc` (v1.32). We obtain an `.html` report which summarises the following characteristics of the dataset:
+
+- both forward and reverse reads contain approximately 96.9M reads, with average length of 143bp (around 70% for both files are 150bp long as we expect) and G content of 43.0%;
+- mean quality score is higher than Phred score of 30 for the full length of the reads;
+- the number of reads with an average quality score higher than Phred = 30 is high for both files, peaking at Phread = 36 for 64.27M reads for the forward reads, and 53.72M reads for the reverse ones;
+- one of the test that 'fails' is the "Overrepresented sequences by sample" section. Upon further investigation, it is found that the overrepresented sequences are long strings of repeated Adenosines and Thymines: this is to be expected when working with RNA, especially when we selected transcripts containing poly-A tails to select eukaryotic transcripts.
+
+## 1. Contig number
+
+For the first 2 metrics, we can use software `assembly_stats` v(v1.0.1) and run the following command on the command line:
+```{}
+assembly_stats <assembly>
+```
+where `<assembly>` stands for:
+
+- `final.contigs.fa` for MEGAHIT;
+- `transcripts.fasta` for spades;
+- `kru2022_trinity.Trinity.fasta` for Trinity.
+
+From this command we obtain the following results:
+
+|Metric                |Megahit     |Spades      |Trinity     |
+|:---------------------|:-----------|:-----------|:-----------|
+|Total #n of basepairs |209456171   |268982435   |326923240   |
+|L50 - N50             |63392 - 912 |98311 - 666 |115084 - 692|
+|Shortest - longest    |200 - 15526 |3 - 14823   |177 - 15506 |
+|Sequence count        |278335      |503534      |609716      |
+
+Where L50 and N50 stand, respectively, for the count of smallest number of contigs whose length sum makes up half of genome size (L50) and sequence length of the shortest contig at 50% of the total assembly length (N50).
+
+## 2. Length distribution
+
+We are also able to plot the distribution of contigs length: after writing short and simple custom python scripts that extract the length of each contig in the .fasta files, we built violin plots as shown in the following plot:
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+megahit_contigs_distribution <- read.table("megahit_contigs_distribution.txt", header = FALSE)
+spades_contigs_distribution <- read.table("spades_contigs_distribution.txt", header = FALSE)
+trinity_contigs_distribution <- read.table("trinity_contigs_distribution.txt", header = FALSE)
+
+colnames(megahit_contigs_distribution) <- c("contig", "lenght")
+colnames(spades_contigs_distribution) <- c("contig", "lenght")
+colnames(trinity_contigs_distribution) <- c("contig", "lenght")
+
+megahit_contigs_distribution$lenght <- as.numeric(megahit_contigs_distribution$lenght)
+spades_contigs_distribution$lenght <- as.numeric(spades_contigs_distribution$lenght)
+trinity_contigs_distribution$lenght <- as.numeric(trinity_contigs_distribution$lenght)
+
+megahit_contigs_distribution$assembler <- "MEGAHIT"
+spades_contigs_distribution$assembler <- "SPAdes"
+trinity_contigs_distribution$assembler <- "Trinity"
+
+all_contigs <- rbind(megahit_contigs_distribution,
+                     spades_contigs_distribution,
+                     trinity_contigs_distribution)
+
+library(ggplot2)
+library(patchwork)
+
+p1 <- ggplot(all_contigs, aes(x = assembler, y = lenght, fill = assembler)) +
+  geom_violin(trim = FALSE) +
+  theme_minimal() +
+  labs(
+    title = "Contig length distribution across assemblers",
+    x = "Assembler",
+    y = "Contig length (bp)"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none"
+  )
+
+p2 <- ggplot(all_contigs, aes(x = assembler, y = lenght, fill = assembler)) +
+  geom_violin(trim = FALSE) +
+  coord_cartesian(ylim = c(0, 2000)) +  
+  theme_minimal() +
+  labs(
+    title = "Zoom: contigs ≤ 2000 bp",
+    x = "Assembler",
+    y = "Contig length (bp)"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none"
+  )
+
+
+p1 + p2
+```
+
+From these plots, it is possible to already suspect that, on average, MEGAHIT assembles longer contigs than the other two assemblers. To statistically test this, I used a custom Python custom script:
+
+```{}
+import pandas as pd
+from scipy import stats
+import numpy as np
+
+megahit = pd.read_csv("megahit_contigs_distribution.txt", sep="\t", names=["contig", "length"]).loc[:,"length"]
+spades = pd.read_csv("spades_contigs_distribution.txt", sep="\t", names=["contig", "length"]).loc[:,"length"]
+trinity = pd.read_csv("trinity_contigs_distribution.txt", sep="\t", names=["contig", "length"]).loc[:,"length"]
+
+megahit = pd.to_numeric(megahit)
+spades = pd.to_numeric(spades)
+trinity = pd.to_numeric(trinity)
+
+mega_spa = stats.mannwhitneyu(megahit, spades, alternative="greater").pvalue
+mega_tri = stats.mannwhitneyu(megahit, trinity, alternative="greater").pvalue
+spa_tri = stats.mannwhitneyu(spades, trinity, alternative="greater").pvalue
+```
+
+which provided the following results, stored in the file `stat_testing.log`:
+```{}
+Using Mann-Whitney U test to test if assemblers create contigs of different length.
+        Megahit:
+                Contigs assembled: 278335
+                Average length:752.5326351339213
+                Standard deviation:691.9899442121476
+        Spades:
+                Contigs assembled: 503534
+                Average length: 534.3329844657958
+                Standard deviation: 586.2493780371271
+        Trinity:
+                Contigs assembled: 609716
+                Average length: 536.1893734131957
+                Standard deviation: 616.081353501832
+
+
+Result for wilcoxon ranked test between megahit and spades:
+                        Megahit assembles, on average, longer contigs than spades with p-value = 0.000000000000000e+00
+Result for wilcoxon ranked test between megahit and trinity:
+                        Megahit assembles, on average, longer contigs than trinity with p-value = 0.000000000000000e+00
+Result for wilcoxon ranked test between spades and trinity:
+                        Spades assembles, on average, longer contigs than trinity with p-value = 0.000000000000000e+00
+```
+
+## 3. Paired-end mapping percentage
+Creating an assembly is important, but so is the actual percentage of reads that actually map on it: to test this, I used software bowtie2 (v2.5.4), first by creating the assembly index with `bowtie2-build <fasta file> <ouput folder>` and then by mapping the paired-end reads files with command `bowtie2 -t <number of threads> -x <shared name of fasta and index file> -1 <forward reads file> -2 <reverse reads file> -S <output .sam file name>`. This resulted in the following results.
+
+### Megahit
+
+```
+96865548 reads; of these:
+  96865548 (100.00%) were paired; of these:
+    8606901 (8.89%) aligned concordantly 0 times
+    72085832 (74.42%) aligned concordantly exactly 1 time
+    16172815 (16.70%) aligned concordantly >1 times
+    ----
+    8606901 pairs aligned concordantly 0 times; of these:
+      1465999 (17.03%) aligned discordantly 1 time
+    ----
+    7140902 pairs aligned 0 times concordantly or discordantly; of these:
+      14281804 mates make up the pairs; of these:
+        10734947 (75.17%) aligned 0 times
+        1978263 (13.85%) aligned exactly 1 time
+        1568594 (10.98%) aligned >1 times
+94.46% overall alignment rate
+```
+
+### Spades
+
+```
+96865548 reads; of these:
+  96865548 (100.00%) were paired; of these:
+    7696388 (7.95%) aligned concordantly 0 times
+    59901293 (61.84%) aligned concordantly exactly 1 time
+    29267867 (30.21%) aligned concordantly >1 times
+    ----
+    7696388 pairs aligned concordantly 0 times; of these:
+      1102791 (14.33%) aligned discordantly 1 time
+    ----
+    6593597 pairs aligned 0 times concordantly or discordantly; of these:
+      13187194 mates make up the pairs; of these:
+        9672307 (73.35%) aligned 0 times
+        1615300 (12.25%) aligned exactly 1 time
+        1899587 (14.40%) aligned >1 times
+95.01% overall alignment rate
+```
+
+### Trinity
+
+```
+96865548 reads; of these:
+  96865548 (100.00%) were paired; of these:
+    7207799 (7.44%) aligned concordantly 0 times
+    52161516 (53.85%) aligned concordantly exactly 1 time
+    37496233 (38.71%) aligned concordantly >1 times
+    ----
+    7207799 pairs aligned concordantly 0 times; of these:
+      983207 (13.64%) aligned discordantly 1 time
+    ----
+    6224592 pairs aligned 0 times concordantly or discordantly; of these:
+      12449184 mates make up the pairs; of these:
+        8566866 (68.81%) aligned 0 times
+        1448780 (11.64%) aligned exactly 1 time
+        2433538 (19.55%) aligned >1 times
+95.58% overall alignment rate
+```
+So, in conclusion, although Trinity provides, on average, shorter reads, it can obtain the highest overall alignment rate.

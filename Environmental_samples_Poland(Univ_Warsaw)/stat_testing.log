@@ -1,0 +1,21 @@
+Using Mann-Whitney U test to test if assemblers create contigs of different length.
+	Megahit:
+		Contigs assembled: 278335
+		Average length:752.5326351339213
+		Standard deviation:691.9899442121476
+	Spades:
+		Contigs assembled: 503534
+		Average length: 534.3329844657958
+		Standard deviation: 586.2493780371271
+	Trinity:
+		Contigs assembled: 609716
+		Average length: 536.1893734131957
+		Standard deviation: 616.081353501832
+
+	
+Result for wilcoxon ranked test between megahit and spades: 
+			Megahit assembles, on average, longer contigs than spades with p-value = 0.000000000000000e+00
+Result for wilcoxon ranked test between megahit and trinity:
+			Megahit assembles, on average, longer contigs than trinity with p-value = 0.000000000000000e+00
+Result for wilcoxon ranked test between spades and trinity: 
+			Spades assembles, on average, longer contigs than trinity with p-value = 0.000000000000000e+00
