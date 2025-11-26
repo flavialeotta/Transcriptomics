@@ -103,7 +103,7 @@ combined_plot <- plot_rin / plot_smrrnart / plot_unique +
 combined_plot
 ```
 
-![](bulkRNA-unimi-_files/figure-gfm/unnamed-chunk-2-1.png)<!-- --> From
+![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- --> From
 these plots, I decided to raise the RIN threshold to 6.5 and the
 percentage of uniquely mapped reads to 85%. The selected patients have
 the following characteristics:
