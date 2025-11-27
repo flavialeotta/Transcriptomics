@@ -9,8 +9,7 @@ This report aims to show how to obtain the results of BulkRNA
 transcriptomics analysis on tissues samples: this code was used for one
 part of the Transcriptomics exam (Prof. Giulio Pavesi) taken by Flavia
 Leotta at the University of Milan in June 2024, which comprehended two
-presentations, one on bulkRNA and another on scRNA analysis. The
-presentation is accessible in the same directory.
+presentations, one on bulkRNA and another on scRNA analysis.
 
 Specifically, this report uses data from Gtex project (processed by
 Recount3), available at the following link
