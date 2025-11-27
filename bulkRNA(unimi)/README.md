@@ -56,7 +56,70 @@ thresholds:
 
 ![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
+<<<<<<< HEAD
 From these plots, we can raise the RIN threshold to 6.5 and the
+=======
+df_smrrnart <- data.frame(
+  Tissue = rep(c("Brain", "Kidney", "Pancreas"),
+               times = c(ncol(rse_brain), ncol(rse_kidney), ncol(rse_pancreas))),
+  Value = c(
+    colData(rse_brain)$gtex.smrrnart,
+    colData(rse_kidney)$gtex.smrrnart,
+    colData(rse_pancreas)$gtex.smrrnart
+  ),
+  Metric = "rRNA%"
+)
+
+df_unique <- data.frame(
+  Tissue = rep(c("Brain", "Kidney", "Pancreas"),
+               times = c(ncol(rse_brain), ncol(rse_kidney), ncol(rse_pancreas))),
+  Value = c(
+    colData(rse_brain)$"recount_qc.star.uniquely_mapped_reads_%_both",
+    colData(rse_kidney)$"recount_qc.star.uniquely_mapped_reads_%_both",
+    colData(rse_pancreas)$"recount_qc.star.uniquely_mapped_reads_%_both"
+  ),
+  Metric = "Uniquely Mapped Reads (%)"
+)
+
+df_all <- rbind(df_rin, df_smrrnart, df_unique)
+tissue_colors <- c("Brain" = "#9E3C76", "Kidney" = "#73B129", "Pancreas" = "#548687")
+
+plot_rin <- ggplot(df_rin, aes(x = Tissue, y = Value, fill = Tissue)) +
+  geom_violin(trim = FALSE, color = "gray40") +
+  geom_boxplot(width = 0.1, fill = "white", outlier.size = 0.5) +
+  scale_fill_manual(values = tissue_colors) +
+  labs(title = "RIN", y = "RIN value") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+
+plot_smrrnart <- ggplot(df_smrrnart, aes(x = Tissue, y = Value, fill = Tissue)) +
+  geom_violin(trim = FALSE, color = "gray40") +
+  geom_boxplot(width = 0.1, fill = "white", outlier.size = 0.5) +
+  scale_fill_manual(values = tissue_colors) +
+  labs(title = "rRNA%", y = "rRNA percentage") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+
+plot_unique <- ggplot(df_unique, aes(x = Tissue, y = Value, fill = Tissue)) +
+  geom_violin(trim = FALSE, color = "gray40") +
+  geom_boxplot(width = 0.1, fill = "white", outlier.size = 0.5) +
+  scale_fill_manual(values = tissue_colors) +
+  labs(title = "Uniquely Mapped Reads (%)", y = "% uniquely mapped reads") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+
+combined_plot <- plot_rin / plot_smrrnart / plot_unique +
+  plot_layout(heights = c(5, 5, 5)) +
+  plot_annotation(
+    title = "Quality Metrics Distribution by Tissue",
+    theme = theme(plot.title = element_text(size = 18, face = "bold", hjust = 0.5))
+  )
+combined_plot
+```
+
+![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- --> From
+these plots, I decided to raise the RIN threshold to 6.5 and the
+>>>>>>> ccfe4be826bdc65a883ade0f6bf4f505837494ad
 percentage of uniquely mapped reads to 85%. The selected patients have
 the following characteristics:
 
